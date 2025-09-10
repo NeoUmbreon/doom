@@ -128,22 +128,6 @@
       :desc "Close tab"
       "b k" #'centaur-tabs--kill-this-buffer-dont-ask)
 
-<<<<<<< HEAD
-=======
-(defun my/vterm-project (project-dir)
-  "Open a vterm buffer for a specific PROJECT-DIR."
-  (interactive "DProject directory: ")
-  (let* ((buf-name (format "vterm:%s" (file-name-nondirectory (directory-file-name project-dir))))
-         (vterm-buf (get-buffer buf-name)))
-    ;; Create the vterm buffer if it doesn’t exist
-    (unless vterm-buf
-      (setq vterm-buf (vterm buf-name))
-      (with-current-buffer vterm-buf
-        (cd project-dir))))
-  ;; Switch to the buffer
-  (switch-to-buffer buf-name))
-
->>>>>>> cc73e1e3a1f61d303bcff9dcd6ee453f6aafaad2
 ;; Normal mode buffer navigation
 (map! :n "M-<left>"  #'centaur-tabs-backward-tab
       :n "M-<right>" #'centaur-tabs-forward-tab)

@@ -141,22 +141,17 @@
   ;; Switch to the buffer
   (switch-to-buffer buf-name))
 
-(map! :leader
-      :desc "Open project vterm"
-      "p t" (lambda () (interactive)
-              (my/vterm-project "~/flakes/pokeprismv-flake/pokeprismv")))
-
 ;; Normal mode buffer navigation
-(map! :n "M-<left>"  #'previous-buffer
-      :n "M-<right>" #'next-buffer)
+(map! :n "M-<left>"  #'centaur-tabs-backward-tab
+      :n "M-<right>" #'centaur-tabs-forward-tab)
 
 ;; Insert mode buffer navigation
-(map! :i "M-<left>"  #'previous-buffer
-      :i "M-<right>" #'next-buffer)
+(map! :i "M-<left>"  #'centaur-tabs-backward-tab
+      :i "M-<right>" #'centaur-tabs-forward-tab)
 
 ;; Visual mode buffer navigation
-(map! :v "M-<left>"  #'previous-buffer
-      :v "M-<right>" #'next-buffer)
+(map! :v "M-<left>"  #'centaur-tabs-backward-tab
+      :v "M-<right>" #'centaur-tabs-forward-tab)
 
 ;; Start Doom Emacs maximized
 (add-to-list 'initial-frame-alist '(fullscreen . maximized))
@@ -194,17 +189,6 @@
       :map vterm-mode-map
       :ni "C-c" #'vterm--self-insert)
 
-;; Open vterm
-;;(map! :leader
-;;      :desc "Open vterm"
-;;      "RET" #'vterm)
-
-;; Open bookmark-jump menu
-;;(map! :leader
-;;      :desc ""
-;;      "RET" #'vterm)
-
-;;describe-keymap doom-leader-map
 ;; Use ~/.config/doom/bookmarks as the bookmark file
 (setq bookmark-default-file (expand-file-name "bookmarks" doom-user-dir)
       bookmark-save-flag 1)
@@ -217,3 +201,8 @@
 
 (after! treemacs
   (treemacs-follow-mode 1))
+
+
+(map! :leader
+      :desc "Open treemacs"
+      "o t" #'treemacs)

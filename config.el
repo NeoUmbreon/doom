@@ -188,3 +188,32 @@
         ("Quit Doom"
          :icon (nerd-icons-faicon "nf-fa-power_off" :face 'doom-dashboard-menu-title)
          :action save-buffers-kill-terminal)))
+
+;; Send ctrl-c in vterm
+(map! :after vterm
+      :map vterm-mode-map
+      :ni "C-c" #'vterm--self-insert)
+
+;; Open vterm
+;;(map! :leader
+;;      :desc "Open vterm"
+;;      "RET" #'vterm)
+
+;; Open bookmark-jump menu
+;;(map! :leader
+;;      :desc ""
+;;      "RET" #'vterm)
+
+;;describe-keymap doom-leader-map
+;; Use ~/.config/doom/bookmarks as the bookmark file
+(setq bookmark-default-file (expand-file-name "bookmarks" doom-user-dir)
+      bookmark-save-flag 1)
+
+;; Make vterm open in a toggleable buffer
+(map! "C-`"
+      (cmd! (if (get-buffer "*vterm*")
+                (+popup/toggle)
+              (vterm))))
+
+(after! treemacs
+  (treemacs-follow-mode 1))

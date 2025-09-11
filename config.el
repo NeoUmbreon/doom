@@ -91,6 +91,16 @@
   (remove-hook 'persp-switch-hook #'treemacs--on-persp-switch)
   (remove-hook 'persp-before-switch-functions #'treemacs--on-persp-before-switch))
 
+;; Enable following the file you're in for treemacs
+(after! treemacs
+  (treemacs-follow-mode 1))
+
+;; Keybind to open treemacs
+(map! :leader
+      :desc "Open treemacs"
+      "o t" #'treemacs)
+
+
 (defun my/doom-sync-and-restart ()
   "Run `doom sync` asynchronously, then restart Doom Emacs when done."
   (interactive)
@@ -108,22 +118,13 @@
          ;; Restart Doom
          (doom/restart))))))
 
+;; Restart and sync keybind for doom 
 (map! :leader
       :desc "Sync Doom and restart"
       "r s" #'my/doom-sync-and-restart)
 
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (dolist (buf (buffer-list))
-              (when (buffer-file-name buf)
-                (with-current-buffer buf
-                  (unless (get-buffer-window buf)
-                    ;; Open the buffer in a hidden window so centaur-tabs picks it up
-                    (split-window-right)
-                    (other-window 1)
-                    (switch-to-buffer buf)
-                    (other-window -1)))))))
 
+;; Kill current tab
 (map! :leader
       :desc "Close tab"
       "b k" #'centaur-tabs--kill-this-buffer-dont-ask)
@@ -149,7 +150,7 @@
       :desc "Open buffer menu"
       "b m" #'buffer-menu)
 
-;; Custom doom dashboard
+;; My custom doom dashboard
 (setq fancy-splash-image "~/Desktop/Wallpapers/emma1-small.png")
 
 (defun my/open-config-file ()
@@ -161,6 +162,9 @@
       '(("Open config.el"
          :icon (nerd-icons-octicon "nf-oct-tools" :face 'doom-dashboard-menu-title)
          :action my/open-config-file)
+        ("Open Org Agenda"
+         :icon (nerd-icons-faicon "nf-fa-book" :face 'doom-dashboard-menu-title)
+         :action org-agenda-list)
         ("Find file"
          :icon (nerd-icons-faicon "nf-fa-file" :face 'doom-dashboard-menu-title)
          :action find-file)
@@ -170,6 +174,10 @@
         ("Quit Doom"
          :icon (nerd-icons-faicon "nf-fa-power_off" :face 'doom-dashboard-menu-title)
          :action save-buffers-kill-terminal)))
+
+(add-hook! '+doom-dashboard-functions :append
+  (insert "\n" (+doom-dashboard--center +doom-dashboard--width "Emma the Emacs Unicorn!")))
+
 
 ;; Send ctrl-c in vterm
 (map! :after vterm
@@ -186,10 +194,78 @@
                 (+popup/toggle)
               (vterm))))
 
-(after! treemacs
-  (treemacs-follow-mode 1))
+;; Variable to store the last reset date
+(defvar my/checkbox-reset-last-date nil
+  "The last date checkboxes were reset.")
 
+(defun my/org-reset-checkboxes-in-file (file)
+  "Reset all checkboxes in FILE by unchecking them."
+  (when (file-exists-p file)
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (while (re-search-forward org-list-full-item-re nil t)
+         (when (org-at-item-checkbox-p)
+           (replace-match "[ ]" nil nil nil 1))))
+      (save-buffer))))
 
+(defun my/org-reset-checkboxes-daily ()
+  "Reset checkboxes in daily.org once per day."
+  (let ((today (format-time-string "%Y-%m-%d")))
+    (unless (string= my/checkbox-reset-last-date today)
+      (setq my/checkbox-reset-last-date today)
+      (my/org-reset-checkboxes-in-file "~/Nextcloud/Notes/org/daily.org"))))
+
+(defun my/open-daily-and-reset ()
+  "Split frame: dashboard on left (2/3), daily.org on right (1/3)."
+  (let ((buf (find-file-noselect "~/Nextcloud/Notes/org/daily.org")))
+    (my/org-reset-checkboxes-daily)
+    (when (string= (buffer-name) "*doom*")
+      ;; Split: left gets 2/3 of width, right gets 1/3
+      (let* ((main (selected-window))
+             (total (window-total-width main))
+             (left-size (floor (* 2 (/ total 3.0)))))
+        (select-window (split-window main left-size 'right))
+        (switch-to-buffer buf)
+        (set-window-dedicated-p (selected-window) t)
+        ;; Go back to dashboard (left side)
+        (select-window main)))))
+
+(defvar my/treemacs-opened-once nil
+  "Non-nil after we've auto-opened treemacs once on startup/dashboard.")
+
+(defun my/open-daily-reset-and-treemacs ()
+  "Open daily.org split, then open Treemacs after a short idle delay."
+  (my/open-daily-and-reset)
+  (unless my/treemacs-opened-once
+    (setq my/treemacs-opened-once t)
+    ;; Wait until Emacs is idle for 1.0s, then open treemacs
+    (run-with-idle-timer 1.0 nil
+                         (lambda ()
+                           (when (fboundp 'treemacs)
+                             (ignore-errors (treemacs)))))))
+
+;; Use this hook (replace your current +doom-dashboard hook if you had one)
+(add-hook '+doom-dashboard-mode-hook #'my/open-daily-reset-and-treemacs)
+
+;; Also run before showing agenda (in case Emacs was left open overnight)
+(add-hook 'org-agenda-mode-hook #'my/org-reset-checkboxes-daily)
+
+;; Force reset daily checkboxes manually
+(defun my/force-reset-daily-checkboxes ()
+  "Force a reset of checkboxes in daily.org, ignoring the date."
+  (interactive)
+  (setq my/checkbox-reset-last-date nil)
+  (my/org-reset-checkboxes-daily))
+
+;; Workaround for "Org Clocking Buffer Definition is void"
+(defun org-clocking-buffer (&rest _))
+
+;; Open doom dashboard
 (map! :leader
-      :desc "Open treemacs"
-      "o t" #'treemacs)
+      :desc "Open Doom dashboard"
+      "d d" #'+doom-dashboard/open)
+
+
+;; Set my org files
+(setq! org-agenda-files '("~/Nextcloud/Notes/org/daily.org"))

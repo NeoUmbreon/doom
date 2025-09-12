@@ -37,11 +37,47 @@
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
 (setq display-line-numbers-type t)
-
+ 
 ;; If you use `org' and don't want your org files in the default location below,
 ;; change `org-directory'. It must be set before org loads!
-(setq org-directory "~/org/")
+(setq org-directory "~/Nextcloud/Notes/org/")
+;; Set my org files
+;;(setq! org-agenda-files '("~/Nextcloud/Notes/org/daily.org"))
+;; Custom to-do keywords
+(after! org
+(setq org-todo-keywords '((sequence "TODO(t)" "PROJ(p)" "CLASS(l)" "HW(h)" "STDY(s)" "CHDR(c)" "DAILY(y)" "WEEKLY(w)" "|" "DONE(d)" "CANCELLED(f)" )))
+(setq org-todo-keyword-faces
+      '(("TODO"       . (:foreground "orange red" :weight bold))
+        ("PROJ"       . (:foreground "deep sky blue" :weight bold))
+        ("CLASS"       . (:foreground "deep sky blue" :weight bold))
+        ("HW"         . (:foreground "medium purple" :weight bold))
+        ("STDY"       . (:foreground "dark cyan" :weight bold))
+        ("CHDR"       . (:foreground "gold" :weight bold))
+        ("DAILY"      . (:foreground "forest green" :weight bold))
+        ("WEEKLY"      . (:foreground "forest green" :weight bold))
+        ("DONE"       . (:foreground "gray50" :weight bold :strike-through t))
+        ("CANCELLED"  . (:foreground "dim gray" :weight bold :strike-through t))))
+;; When marked as done, adds timestamp
+(setq org-log-done 'time)
+;; Show 10 days
+(setq org-agenda-span 10)
+;; Don't show Sched.##x
+;;(setq org-agenda-scheduled-leaders '("" ""))
 
+;; Include habits in the agenda
+(setq org-agenda-custom-commands
+      '(("h" "Habits" agenda ""
+         ((org-agenda-include-diary nil)
+          (org-agenda-overriding-header "Habits")
+          (org-agenda-sorting-strategy
+           '(habit-down time-up))))))
+
+;; Or to always include habits in the daily agenda:
+(setq org-agenda-todo-ignore-scheduled 'future)
+(setq org-agenda-todo-ignore-deadlines 'future)
+(setq org-agenda-todo-ignore-with-date nil)
+
+)
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
 ;; `after!' block, otherwise Doom's defaults may override your settings. E.g.
@@ -151,17 +187,17 @@
       "b m" #'buffer-menu)
 
 ;; My custom doom dashboard
-(setq fancy-splash-image "~/Desktop/Wallpapers/emma1-small.png")
+(setq fancy-splash-image "~/.config/doom/emma1-small.png")
 
-(defun my/open-config-file ()
-  "Open my Doom config.el file."
+(defun my/open-daily-org ()
+  "Open my daily.org."
   (interactive)
-  (find-file "~/.config/doom/config.el"))
+  (find-file "~/Nextcloud/Notes/org/daily.org"))
 
 (setq +doom-dashboard-menu-sections
-      '(("Open config.el"
+      '(("Open daily.org"
          :icon (nerd-icons-octicon "nf-oct-tools" :face 'doom-dashboard-menu-title)
-         :action my/open-config-file)
+         :action my/open-daily-org)
         ("Open Org Agenda"
          :icon (nerd-icons-faicon "nf-fa-book" :face 'doom-dashboard-menu-title)
          :action org-agenda-list)
@@ -216,27 +252,48 @@
       (setq my/checkbox-reset-last-date today)
       (my/org-reset-checkboxes-in-file "~/Nextcloud/Notes/org/daily.org"))))
 
-(defun my/open-daily-and-reset ()
-  "Split frame: dashboard on left (2/3), daily.org on right (1/3)."
-  (let ((buf (find-file-noselect "~/Nextcloud/Notes/org/daily.org")))
-    (my/org-reset-checkboxes-daily)
-    (when (string= (buffer-name) "*doom*")
-      ;; Split: left gets 2/3 of width, right gets 1/3
-      (let* ((main (selected-window))
-             (total (window-total-width main))
-             (left-size (floor (* 2 (/ total 3.0)))))
-        (select-window (split-window main left-size 'right))
-        (switch-to-buffer buf)
-        (set-window-dedicated-p (selected-window) t)
-        ;; Go back to dashboard (left side)
-        (select-window main)))))
+;; (defun my/open-agenda-and-reset ()
+;;   "Split frame: dashboard on left (1/3), org-agenda on right (2/3)."
+;;   (when (string= (buffer-name) "*doom*")
+;;     ;; Split: left gets 1/3 of width, right gets 2/3
+;;     (let* ((main (selected-window))
+;;            (total (window-total-width main))
+;;            (left-size (floor (* 1 (/ total 3.0)))))
+;;       (select-window (split-window main left-size 'right))
+;;       ;; Show agenda
+;;       (org-agenda-list)
+;;       (set-window-dedicated-p (selected-window) t)
+;;       ;; Back to dashboard
+;;       (select-window main))))
+
+(defun my/open-agenda-and-reset ()
+  "Split frame: dashboard on left (~40%), org-agenda on right (~60%)."
+  (when (string= (buffer-name) "*doom*")
+    (let* ((main (selected-window))
+           (total (window-total-width main))
+           (left-size (floor (* total 0.60)))) ;; dashboard = 60%, agenda = 40%
+      (select-window (split-window main left-size 'right))
+      (org-agenda-list)
+      (set-window-dedicated-p (selected-window) t)
+      (select-window main))))
+
+(defun my/open-agenda-split ()
+  "Open org-agenda in a right split (~60%) while keeping current buffer on left."
+  (interactive)
+  (let* ((main (selected-window))
+         (total (window-total-width main))
+         (left-size (floor (* total 0.60)))) ;; left = 60%, right = 40%
+    (select-window (split-window main left-size 'right))
+    (org-agenda-list)
+    (set-window-dedicated-p (selected-window) t)
+    (select-window main)))
 
 (defvar my/treemacs-opened-once nil
   "Non-nil after we've auto-opened treemacs once on startup/dashboard.")
 
 (defun my/open-daily-reset-and-treemacs ()
   "Open daily.org split, then open Treemacs after a short idle delay."
-  (my/open-daily-and-reset)
+  (my/open-agenda-and-reset)
   (unless my/treemacs-opened-once
     (setq my/treemacs-opened-once t)
     ;; Wait until Emacs is idle for 1.0s, then open treemacs
@@ -266,6 +323,5 @@
       :desc "Open Doom dashboard"
       "d d" #'+doom-dashboard/open)
 
-
-;; Set my org files
-(setq! org-agenda-files '("~/Nextcloud/Notes/org/daily.org"))
+;; Enable right click context menu
+(setq context-menu-mode t)

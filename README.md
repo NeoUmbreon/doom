@@ -1,2 +1,4 @@
 # doom
-My Doom Emacs config
+My [Doom Emacs](https://github.com/doomemacs/doomemacs) config
+
+[Source for dashboard image](https://tess.lemmy.ca/post/lemmy.ca/7814571)

@@ -45,6 +45,7 @@
 ;;(setq! org-agenda-files '("~/Nextcloud/Notes/org/daily.org"))
 ;; Custom to-do keywords
 (after! org
+;;(require 'org-mouse)
 (setq org-todo-keywords '((sequence "TODO(t)" "PROJ(p)" "CLASS(l)" "HW(h)" "STDY(s)" "CHDR(c)" "DAILY(y)" "WEEKLY(w)" "|" "DONE(d)" "CANCELLED(f)" )))
 (setq org-todo-keyword-faces
       '(("TODO"       . (:foreground "orange red" :weight bold))
@@ -190,9 +191,18 @@
 (setq fancy-splash-image "~/.config/doom/emma1-small.png")
 
 (defun my/open-daily-org ()
-  "Open my daily.org."
+  "Open my daily.org, reusing the Doom dashboard window if it exists."
   (interactive)
-  (find-file "~/Nextcloud/Notes/org/daily.org"))
+  (let ((dbuf (get-buffer "*doom*")))
+    (if-let ((dwin (get-buffer-window dbuf)))
+        (progn
+          ;; Allow replacing the dashboard buffer
+          (set-window-dedicated-p dwin nil)
+          (select-window dwin)
+          (kill-buffer dbuf)
+          (find-file "~/Nextcloud/Notes/org/daily.org"))
+      ;; fallback if dashboard isn’t visible
+      (find-file "~/Nextcloud/Notes/org/daily.org"))))
 
 (setq +doom-dashboard-menu-sections
       '(("Open daily.org"
@@ -267,7 +277,7 @@
 ;;       (select-window main))))
 
 (defun my/open-agenda-and-reset ()
-  "Split frame: dashboard on left (~40%), org-agenda on right (~60%)."
+  "Split frame: dashboard on left (~60%), org-agenda on right (~40%)."
   (when (string= (buffer-name) "*doom*")
     (let* ((main (selected-window))
            (total (window-total-width main))
@@ -302,11 +312,10 @@
                            (when (fboundp 'treemacs)
                              (ignore-errors (treemacs)))))))
 
-;; Use this hook (replace your current +doom-dashboard hook if you had one)
 (add-hook '+doom-dashboard-mode-hook #'my/open-daily-reset-and-treemacs)
 
 ;; Also run before showing agenda (in case Emacs was left open overnight)
-(add-hook 'org-agenda-mode-hook #'my/org-reset-checkboxes-daily)
+;;(add-hook 'org-agenda-mode-hook #'my/org-reset-checkboxes-daily)
 
 ;; Force reset daily checkboxes manually
 (defun my/force-reset-daily-checkboxes ()
@@ -325,3 +334,20 @@
 
 ;; Enable right click context menu
 (setq context-menu-mode t)
+
+(defun my/kill-all-non-percent-buffers ()
+  "Kill all buffers whose names do NOT start with `%`."
+  (interactive)
+  (dolist (buf (buffer-list))
+    (let ((name (buffer-name buf)))
+      ;; Skip buffers starting with '%' or '*' to avoid killing important ones
+      (unless (or (string-prefix-p "%" name)
+                  (string-prefix-p "*" name))
+        (when (buffer-live-p buf)
+          (kill-buffer buf))))))
+
+(defun org-no-frills-copy (beg end)
+  (interactive "r")
+  (let ((kill-transform-function (lambda (text)
+                                   (replace-regexp-in-string "^*+ \\|:[[:alnum:]:]*:" "" text))))
+    (clipboard-kill-ring-save beg end)))

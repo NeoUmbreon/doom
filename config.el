@@ -46,6 +46,14 @@
 ;; Custom to-do keywords
 (after! org
 ;;(require 'org-mouse)
+(add-hook 'org-mode-hook
+        (lambda ()
+        (org-map-entries
+        (lambda ()
+                (org-fold-hide-entry))
+        "/DONE")))
+
+
 (setq org-todo-keywords '((sequence "TODO(t)" "PROJ(p)" "CLASS(l)" "HW(h)" "STDY(s)" "CHDR(c)" "DAILY(y)" "WEEKLY(w)" "|" "DONE(d)" "CANCELLED(f)" )))
 (setq org-todo-keyword-faces
       '(("TODO"       . (:foreground "orange red" :weight bold))
@@ -72,11 +80,31 @@
           (org-agenda-overriding-header "Habits")
           (org-agenda-sorting-strategy
            '(habit-down time-up))))))
-
-;; Or to always include habits in the daily agenda:
 (setq org-agenda-todo-ignore-scheduled 'future)
 (setq org-agenda-todo-ignore-deadlines 'future)
 (setq org-agenda-todo-ignore-with-date nil)
+
+;; Checkbox reset
+(defun my/org-reset-checkbox-state-subtree ()
+  "Uncheck all item checkboxes in the current subtree."
+  (interactive)
+  (save-excursion
+    (org-back-to-heading t)
+    (let ((end (save-excursion (org-end-of-subtree t t))))
+      (save-restriction
+        (narrow-to-region (point) end)
+        (goto-char (point-min))
+        ;; Reset [X] or [x] to [ ]
+        (while (re-search-forward "\\[\\([Xx]\\)\\]" nil t)
+          (replace-match "[ ]" nil nil))
+        (org-update-checkbox-count-maybe 'all)))))
+
+(defun my/org-reset-checkboxes-on-done ()
+  "When a heading is set to any DONE state, reset its checkboxes."
+  (when (org-entry-is-done-p)
+    (my/org-reset-checkbox-state-subtree)))
+
+(add-hook 'org-after-todo-state-change-hook #'my/org-reset-checkboxes-on-done)
 
 )
 
@@ -240,82 +268,13 @@
                 (+popup/toggle)
               (vterm))))
 
-;; Variable to store the last reset date
-(defvar my/checkbox-reset-last-date nil
-  "The last date checkboxes were reset.")
+;; Open doom dashboard
+(map! :leader
+      :desc "Open Doom dashboard"
+      "d d" #'+doom-dashboard/open)
 
-(defun my/org-reset-checkboxes-in-file (file)
-  "Reset all checkboxes in FILE by unchecking them."
-  (when (file-exists-p file)
-    (with-current-buffer (find-file-noselect file)
-      (org-with-wide-buffer
-       (goto-char (point-min))
-       (while (re-search-forward org-list-full-item-re nil t)
-         (when (org-at-item-checkbox-p)
-           (replace-match "[ ]" nil nil nil 1))))
-      (save-buffer))))
-
-(defun my/org-reset-checkboxes-daily ()
-  "Reset checkboxes in daily.org once per day."
-  (let ((today (format-time-string "%Y-%m-%d")))
-    (unless (string= my/checkbox-reset-last-date today)
-      (setq my/checkbox-reset-last-date today)
-      (my/org-reset-checkboxes-in-file "~/Nextcloud/Notes/org/daily.org"))))
-
-;; (defun my/open-agenda-and-reset ()
-;;   "Split frame: dashboard on left (1/3), org-agenda on right (2/3)."
-;;   (when (string= (buffer-name) "*doom*")
-;;     ;; Split: left gets 1/3 of width, right gets 2/3
-;;     (let* ((main (selected-window))
-;;            (total (window-total-width main))
-;;            (left-size (floor (* 1 (/ total 3.0)))))
-;;       (select-window (split-window main left-size 'right))
-;;       ;; Show agenda
-;;       (org-agenda-list)
-;;       (set-window-dedicated-p (selected-window) t)
-;;       ;; Back to dashboard
-;;       (select-window main))))
-
-(defun my/open-agenda-and-reset ()
-  "Split frame: dashboard on left (~60%), org-agenda on right (~40%)."
-  (when (string= (buffer-name) "*doom*")
-    (let* ((main (selected-window))
-           (total (window-total-width main))
-           (left-size (floor (* total 0.60)))) ;; dashboard = 60%, agenda = 40%
-      (select-window (split-window main left-size 'right))
-      (org-agenda-list)
-      (set-window-dedicated-p (selected-window) t)
-      (select-window main))))
-
-(defun my/open-agenda-split ()
-  "Open org-agenda in a right split (~60%) while keeping current buffer on left."
-  (interactive)
-  (let* ((main (selected-window))
-         (total (window-total-width main))
-         (left-size (floor (* total 0.60)))) ;; left = 60%, right = 40%
-    (select-window (split-window main left-size 'right))
-    (org-agenda-list)
-    (set-window-dedicated-p (selected-window) t)
-    (select-window main)))
-
-(defvar my/treemacs-opened-once nil
-  "Non-nil after we've auto-opened treemacs once on startup/dashboard.")
-
-(defun my/open-daily-reset-and-treemacs ()
-  "Open daily.org split, then open Treemacs after a short idle delay."
-  (my/open-agenda-and-reset)
-  (unless my/treemacs-opened-once
-    (setq my/treemacs-opened-once t)
-    ;; Wait until Emacs is idle for 1.0s, then open treemacs
-    (run-with-idle-timer 1.0 nil
-                         (lambda ()
-                           (when (fboundp 'treemacs)
-                             (ignore-errors (treemacs)))))))
-
-(add-hook '+doom-dashboard-mode-hook #'my/open-daily-reset-and-treemacs)
-
-;; Also run before showing agenda (in case Emacs was left open overnight)
-;;(add-hook 'org-agenda-mode-hook #'my/org-reset-checkboxes-daily)
+;; Enable right click context menu
+(setq context-menu-mode t)
 
 ;; Force reset daily checkboxes manually
 (defun my/force-reset-daily-checkboxes ()
@@ -327,27 +286,102 @@
 ;; Workaround for "Org Clocking Buffer Definition is void"
 (defun org-clocking-buffer (&rest _))
 
-;; Open doom dashboard
-(map! :leader
-      :desc "Open Doom dashboard"
-      "d d" #'+doom-dashboard/open)
 
-;; Enable right click context menu
-(setq context-menu-mode t)
 
-(defun my/kill-all-non-percent-buffers ()
-  "Kill all buffers whose names do NOT start with `%`."
-  (interactive)
-  (dolist (buf (buffer-list))
-    (let ((name (buffer-name buf)))
-      ;; Skip buffers starting with '%' or '*' to avoid killing important ones
-      (unless (or (string-prefix-p "%" name)
-                  (string-prefix-p "*" name))
-        (when (buffer-live-p buf)
-          (kill-buffer buf))))))
+(defun my/open-agenda-split ()
+  "Split frame: dashboard on left (~60%), org-agenda on right (~40%)."
+  (when (string= (buffer-name) "*doom*")
+    (let* ((main (selected-window))
+           (total (window-total-width main))
+           (left-size (floor (* total 0.60)))) ;; dashboard = 60%, agenda = 40%
+      (select-window (split-window main left-size 'right))
+      (org-agenda-list)
+      (set-window-dedicated-p (selected-window) t)
+      (select-window main))))
+
+(defvar my/treemacs-opened-once nil
+  "Non-nil after we've auto-opened treemacs once on startup/dashboard.")
+
+(defun my/open-agenda-and-treemacs ()
+  "Open daily.org split, then open Treemacs after a short idle delay."
+  (my/open-agenda-split)
+  (unless my/treemacs-opened-once
+    (setq my/treemacs-opened-once t)
+    ;; Wait until Emacs is idle for 1.0s, then open treemacs
+    (run-with-idle-timer 1.0 nil
+                         (lambda ()
+                           (when (fboundp 'treemacs)
+                             (ignore-errors (treemacs)))))))
+
+;;(add-hook '+doom-dashboard-mode-hook #'my/open-agenda-and-treemacs)
+
+;;(map! )
+;;<mouse-8>
+;;<mouse-9>
+;;centaur-tabs
 
 (defun org-no-frills-copy (beg end)
   (interactive "r")
   (let ((kill-transform-function (lambda (text)
                                    (replace-regexp-in-string "^*+ \\|:[[:alnum:]:]*:" "" text))))
-    (clipboard-kill-ring-save beg end)))
+    (copy-region-as-kill beg end)))
+
+
+
+(defun my/open-daily-and-agenda ()
+  "Open daily.org, Treemacs, and Org Agenda side by side."
+  (interactive)
+  ;; Step 1: Open daily.org in main window
+  (find-file "~/Nextcloud/Notes/org/daily.org")
+
+ (let ((main-window (selected-window)))  ;; remember main window
+
+    ;; Step 2: Open Treemacs on the left
+    (treemacs)
+
+    ;; Step 3: Switch back to main window, then split and open Org Agenda
+    (select-window main-window)
+    (let ((agenda-window (split-window-right)))
+      (select-window agenda-window)
+      (org-agenda nil "a"))))
+
+;; Run automatically after Emacs starts
+(add-hook 'doom-init-ui-hook #'my/open-daily-and-agenda)
+
+
+(defun my/org-agenda-evil-quit ()
+  "Run `evil-quit` when pressing q in an Org Agenda window."
+  (interactive)
+  (evil-quit))
+
+(with-eval-after-load 'org-agenda
+  (define-key org-agenda-mode-map (kbd "q") #'my/org-agenda-evil-quit))
+
+(defun my/open-org-agenda ()
+  "Open Org Agenda on the right."
+  (interactive)
+  ;; Find the window that is not a Treemacs window
+  (let ((main-window
+         (seq-find (lambda (w)
+                     (not (eq 'treemacs-mode
+                              (buffer-local-value 'major-mode (window-buffer w)))))
+                   (window-list))))
+    (when main-window
+      (select-window main-window)
+      ;; If the agenda buffer doesn't exist, create it in a right split
+      (unless (get-buffer "*Org Agenda*")
+        (let ((agenda-window (split-window-right)))
+          (select-window agenda-window)
+          (org-agenda nil "a")))
+      ;; If the agenda buffer exists, just select it
+      (let ((agenda-window (get-buffer-window "*Org Agenda*" t)))
+        (if (window-live-p agenda-window)
+            (select-window agenda-window)
+          ;; Otherwise, create it
+          (let ((agenda-window (split-window-right)))
+            (select-window agenda-window)
+            (org-agenda nil "a")))))))
+
+(map! :leader
+      :desc "Open Org Agenda"
+      "o a" #'my/open-org-agenda)
